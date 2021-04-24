@@ -1,0 +1,6 @@
+{
+  "BOT_TOKEN": "token_here",
+  "DEFAULT_PREFIX": "mod.",
+  "MEMBER_INTENTS": true,
+  "PRESENCE_INTENTS": false
+}
