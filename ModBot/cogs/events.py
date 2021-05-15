@@ -6,6 +6,7 @@ import asyncio
 from datetime import datetime, timedelta
 import asqlite
 
+
 class EventsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -15,7 +16,7 @@ class EventsCog(commands.Cog):
     async def on_ready(self):
         if self.bot.first_on_ready:
             self.bot.db = await asqlite.connect('guild_config.db', check_same_thread=False)
-            self.bot.configs = await self.bot.GuildConfig.load_all_configs()
+            self.bot.configs = await self.bot.load_all_configs()
             self.bot.first_on_ready = False
         print(f'\n\nLogged in as: {self.bot.user.name} - {self.bot.user.id}\nVersion: {discord.__version__}\n')
         print(f'Successfully logged in and booted...!')
@@ -36,7 +37,7 @@ class EventsCog(commands.Cog):
         \n\nReason: {reason or "No reason specified"}', color=discord.Color.red())
         embed.set_thumbnail(url=banned.avatar_url)
 
-        await self.bot.GuildConfig.get_config(guild).log(embed)
+        await self.bot.get_config(guild).log(embed)
 
     @commands.Cog.listener()
     async def on_member_unban(self, guild: discord.Guild, unbanned: discord.User):
@@ -54,7 +55,7 @@ class EventsCog(commands.Cog):
         \n\nReason: {reason or "No reason specified"}', color=discord.Color.green())
         embed.set_thumbnail(url=unbanned.avatar_url)
 
-        await self.bot.GuildConfig.get_config(guild).log(embed)
+        await self.bot.get_config(guild).log(embed)
 
     @commands.Cog.listener()
     async def on_member_remove(self, kicked: discord.Member):
@@ -75,13 +76,13 @@ class EventsCog(commands.Cog):
         \n\nReason: {reason or "No reason specified"}', color=discord.Color.red())
         embed.set_thumbnail(url=kicked.avatar_url)
 
-        await self.bot.GuildConfig.get_config(kicked.guild).log(embed)
+        await self.bot.get_config(kicked.guild).log(embed)
 
     @commands.Cog.listener()
     async def on_message_delete(self, message):
         if message.guild and not message.author.bot:
-            self.bot.sniped.append(message)
-            self.bot.sniped = self.bot.sniped[-1000:]
+            self.bot.sniped[:0] = [message]
+            self.bot.sniped = self.bot.sniped[:5000]
 
 
 def setup(bot):

@@ -22,7 +22,11 @@ class MyHelp(commands.HelpCommand):
 
     async def send_bot_help(self, mapping):
         embed = embed_create(self.context.author, title='Help:',
-                             description=f'``{self.clean_prefix}help [command]`` for command info')
+                             description=f'`{self.clean_prefix}help [command]` for command info\n'
+                                         f'`<arg>` - Required argument\n'
+                                         f'`[arg]` - Optional argument\n'
+                                         f'`[arg=10]` - Optional argument, `10` is default\n'
+                                         f'`<users>...` - You can specify multiple users')
         for cog, command in mapping.items():
             _filtered = []
             for c in command:

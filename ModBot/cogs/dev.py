@@ -3,7 +3,7 @@ import io
 import textwrap
 import traceback
 from contextlib import redirect_stdout
-from typing import Optional, Union
+from typing import Union
 
 import discord
 from discord.ext import commands
@@ -28,45 +28,51 @@ class DevCog(commands.Cog):
 
     @dev.command(hidden=True)
     @commands.is_owner()
-    async def load(self, ctx, *, cog: str):
-        try:
-            self.bot.load_extension(cog)
-        except Exception as e:
-            embed = discord.Embed(title='Error!', description=f'{type(e).__name__} - {e}', color=0xeb4034)
-            return await ctx.send(embed=embed)
+    async def load(self, ctx, *cogs: str):
+        for cog in cogs:
+            try:
+                self.bot.load_extension(f'cogs.{cog}')
+            except Exception as e:
+                embed = discord.Embed(title='Error!', description=f'{type(e).__name__} - {e}', color=0xeb4034)
+                return await ctx.send(embed=embed)
 
-        embed = discord.Embed(title='Success!', description=f'Cog ``{cog}`` has been loaded!')
+        embed = discord.Embed(title='Success!', description=f'Cogs ``{", ".join(cogs)}`` has been loaded!',
+                              color=discord.Color.green())
         await ctx.send(embed=embed)
 
     @dev.command(hidden=True)
     @commands.is_owner()
-    async def unload(self, ctx, *, cog: str):
-        try:
-            self.bot.unload_extension(cog)
-        except Exception as e:
-            embed = discord.Embed(title='Error!', description=f'{type(e).__name__} - {e}', color=0xeb4034)
-            return await ctx.send(embed=embed)
+    async def unload(self, ctx, *cogs: str):
+        for cog in cogs:
+            try:
+                self.bot.unload_extension(f'cogs.{cog}')
+            except Exception as e:
+                embed = discord.Embed(title='Error!', description=f'{type(e).__name__} - {e}', color=0xeb4034)
+                return await ctx.send(embed=embed)
 
-        embed = discord.Embed(title='Success!', description=f'Cog ``{cog}`` has been unloaded!')
+        embed = discord.Embed(title='Success!', description=f'Cogs ``{", ".join(cogs)}`` has been unloaded!',
+                              color=discord.Color.green())
         await ctx.send(embed=embed)
 
     @dev.command(hidden=True)
     @commands.is_owner()
-    async def reload(self, ctx, *, cog: str):
-        try:
-            self.bot.unload_extension(cog)
-            self.bot.load_extension(cog)
-        except Exception as e:
-            embed = discord.Embed(title='Error!', description=f'{type(e).__name__} - {e}', color=0xeb4034)
-            return await ctx.send(embed=embed)
+    async def reload(self, ctx, *cogs: str):
+        for cog in cogs:
+            try:
+                self.bot.reload_extension(f'cogs.{cog}')
+            except Exception as e:
+                embed = discord.Embed(title='Error!', description=f'{type(e).__name__} - {e}', color=0xeb4034)
+                return await ctx.send(embed=embed)
 
-        embed = discord.Embed(title='Success!', description=f'Cog ``{cog}`` has been reloaded!')
+        embed = discord.Embed(title='Success!', description=f'Cog ``{", ".join(cogs)}`` has been reloaded!',
+                              color=discord.Color.green())
         await ctx.send(embed=embed)
 
     @dev.command(hidden=True)
     @commands.is_owner()
     async def list(self, ctx):
-        embed = discord.Embed(title='Showing all loaded cogs...', description='\n'.join(self.bot.cogs))
+        embed = discord.Embed(title='Showing all loaded cogs...', description='\n'.join(self.bot.cogs),
+                              color=discord.Color.green())
         embed.add_field(name='Number of cogs loaded:', value=f'{len(self.bot.cogs)} cogs', inline=False)
         await ctx.send(embed=embed)
 
@@ -118,7 +124,7 @@ class DevCog(commands.Cog):
                 else:
                     value = stdout.getvalue()
                     self._last_result = ret
-                    if len(value) + len(ret) < 2000:
+                    if len(str(value)) + len(str(ret)) < 2000:
                         embed = discord.Embed(title='Exec result:', description=f'```py\n{value}{ret}\n```')
                     else:
                         for long_val in [ret[i:i + 2000] for i in range(0, len(ret), 2000)]:
@@ -132,17 +138,12 @@ class DevCog(commands.Cog):
 
     @dev.command(hidden=True)
     @commands.is_owner()
-    async def sudo(self, ctx, channel: Optional[discord.TextChannel], who: Union[discord.Member, discord.User], *,
+    async def sudo(self, ctx, who: Union[discord.Member, discord.User], *,
                    command: str):
         msg = copy.copy(ctx.message)
-        channel = channel or ctx.channel
-        msg.channel = channel
+        msg.channel = ctx.channel
         msg.author = who
-        if isinstance(channel, discord.channel.DMChannel):
-            prefix = self.bot.default_prefix
-        else:
-            prefix = self.bot.prefixes.get(channel.guild.id, self.bot.default_prefix)
-        msg.content = prefix + command
+        msg.content = ctx.prefix + command
         new_ctx = await self.bot.get_context(msg, cls=type(ctx))
         await self.bot.invoke(new_ctx)
 

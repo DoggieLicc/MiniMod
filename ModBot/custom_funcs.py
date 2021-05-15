@@ -2,7 +2,7 @@ import discord
 import re
 from discord.ext import commands, menus
 
-__all__ = ["CannotPunish", "embed_create", "TimeConverter", "IntentionalUser", "IntentionalMember", "trash_button"]
+__all__ = ["CannotPunish", "embed_create", "TimeConverter", "IntentionalUser", "IntentionalMember", "CustomMenu"]
 
 
 class CannotPunish(commands.CommandError):
@@ -142,8 +142,18 @@ class IntentionalUser(commands.converter.UserConverter):
         raise commands.errors.UserNotFound(argument)
 
 
-async def do_trash(self, payload):
-    await self.message.delete()
+class CustomMenu(menus.MenuPages):
+    @menus.button('\N{WASTEBASKET}\ufe0f', position=menus.Last(3))
+    async def do_trash(self, _):
+        self.stop()
+        await self.message.delete()
 
+    def stop(self):
+        self.call_end_event()
+        super().stop()
 
-trash_button = menus.Button('\N{WASTEBASKET}', do_trash, position=menus.Last(3))
+    async def finalize(self, timed_out):
+        self.call_end_event()
+
+    def call_end_event(self):
+        self.bot.dispatch('finalize_menu', self.ctx)

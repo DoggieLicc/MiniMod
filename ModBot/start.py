@@ -18,7 +18,10 @@ import datetime
 with open('config.json') as setup:
     secrets = json.load(setup)
 
-intents = discord.Intents.default()
+intents = discord.Intents.none()
+intents.messages = True
+intents.reactions = True
+intents.guilds = True
 intents.members = secrets['MEMBER_INTENTS']
 intents.presences = secrets['PRESENCE_INTENTS']
 
@@ -27,6 +30,7 @@ class CustomBot(commands.Bot):
     db = None
     sniped = []
     first_on_ready = True
+    configs = []
 
     def __init__(self, **options):
         super().__init__(help_command=None, description=None, **options)
@@ -41,7 +45,7 @@ class CustomBot(commands.Bot):
                      prefix: str = None, mute: discord.Role = None):
             self._guild = guild
             self._logs = logs
-            self._prefix = prefix
+            self._prefix = prefix or bot.default_prefix
             self._mute = mute
 
         async def set_config(self, **kwargs):
@@ -51,34 +55,13 @@ class CustomBot(commands.Bot):
 
             async with bot.db.cursor() as cursor:
                 await cursor.execute('REPLACE INTO config VALUES(?, ?, ?, ?)',
-                                     (self._guild.id, self._logs.id, self._prefix, self._mute.id))
+                                     (self._guild.id,
+                                      self._logs.id if self._logs else None,
+                                      self._prefix,
+                                      self._mute.id if self._mute else None))
                 await bot.db.commit()
-            await bot.GuildConfig.load_all_configs()
+            await bot.load_all_configs()
             return self
-
-        @staticmethod
-        async def load_all_configs():
-            guild_configs = []
-            async with bot.db.cursor() as cursor:
-                for row in await cursor.execute('SELECT * FROM config'):
-                    if not (guild := bot.get_guild(row[0])):
-                        continue
-                    log_channel = guild.get_channel(row[1])
-                    prefix = row[2]
-                    mute = guild.get_role(row[3])
-                    guild_configs.append(bot.GuildConfig(guild, log_channel, prefix, mute))
-
-            bot.configs = guild_configs
-            return guild_configs
-
-        @staticmethod
-        def get_config(guild: discord.Guild):
-            if not isinstance(guild, discord.Guild):
-                return None
-            for config in bot.configs:
-                if config.guild == guild:
-                    return config
-            return bot.GuildConfig(guild)
 
         async def multi_ban(self, mod: discord.Member, users: [discord.Member, discord.User], reason: Optional[str]):
             if not mod.guild_permissions.ban_members:
@@ -195,16 +178,43 @@ class CustomBot(commands.Bot):
         def mute(self):
             return self._mute
 
+    def get_config(self, guild: discord.Guild):
+        if not isinstance(guild, discord.Guild):
+            return None
+        for config in self.configs:
+            if config.guild == guild:
+                return config
+        return self.GuildConfig(guild)
+
+    async def load_all_configs(self):
+        guild_configs = []
+        async with self.db.cursor() as cursor:
+            for row in await cursor.execute('SELECT * FROM config'):
+                if not (guild := self.get_guild(row[0])):
+                    continue
+                log_channel = guild.get_channel(row[1])
+                prefix = row[2]
+                mute = guild.get_role(row[3])
+                guild_configs.append(bot.GuildConfig(guild, log_channel, prefix, mute))
+
+        self.configs = guild_configs
+        return guild_configs
+
     async def on_message(self, message):
         if message.author.bot:
             return
 
         if message.content in [f"<@!{self.user.id}>", f"<@{self.user.id}>"]:
             prefix = _get_prefix(self, message)
-            embed = embed_create(message.author, title='Pinged!', description=f'The current prefix is ``{prefix}``')
+            embed = embed_create(message.author, title='Pinged!', description=f'The current prefixes are '
+                                                                              f'``{prefix[0]}`` and {bot.user.mention}')
             await message.channel.send(embed=embed)
 
         await self.process_commands(message)
+
+    async def close(self):
+        await bot.db.close()
+        await super().close()
 
     @property
     def secrets(self):
@@ -218,7 +228,7 @@ class CustomBot(commands.Bot):
 class CustomContext(commands.Context):
     def __init__(self, **attrs):
         super().__init__(**attrs)
-        self._config = bot.GuildConfig.get_config(self.guild)
+        self._config = bot.get_config(self.guild)
 
     async def multi_ban(self, *args):
         return await self._config.multi_ban(*args)
@@ -238,8 +248,11 @@ class CustomContext(commands.Context):
     async def set_config(self, **kwargs):
         return await self._config.set_config(**kwargs)
 
+    async def log(self, *args):
+        return await self._config.log(*args)
+
     def get_config(self):
-        return self._config.get_config(self.guild)
+        return self.bot.get_config(self.guild)
 
     @property
     def logs(self):
@@ -260,14 +273,14 @@ class CustomContext(commands.Context):
 
 def _get_prefix(b, msg: discord.Message):
     if not msg.guild:
-        return b.default_prefix
-    if config := b.GuildConfig.get_config(msg.guild):
-        return config.prefix
-    return b.default_prefix
+        return [b.default_prefix, f'<@{b.user.id}>', f'<@!{b.user.id}>']
+    if config := bot.get_config(msg.guild):
+        return [config.prefix, f'<@{b.user.id}>', f'<@!{b.user.id}>']
+    return [b.default_prefix, f'<@{b.user.id}>', f'<@!{b.user.id}>']
 
 
 bot = CustomBot(case_insensitive=True, intents=intents, command_prefix=_get_prefix,
-                activity=discord.Game(name='mod.help for help!'), strip_after_prefix=True)
+                activity=discord.Game(name='mod.help for help!'), strip_after_prefix=True, max_messages=10000)
 
 if __name__ == '__main__':
     for file in os.listdir('./cogs'):
