@@ -10,7 +10,8 @@ import discord
 
 from discord.ext import commands
 import json
-from typing import Optional
+import time
+from typing import Optional, Union
 from custom_funcs import *
 
 import datetime
@@ -32,10 +33,30 @@ class CustomBot(commands.Bot):
     first_on_ready = True
     configs = []
 
+    @staticmethod
+    def _get_prefix(b, msg: discord.Message):
+        if not msg.guild:
+            return [b.default_prefix, f'<@{b.user.id}>', f'<@!{b.user.id}>']
+        if config := bot.get_config(msg.guild):
+            return [config.prefix, f'<@{b.user.id}>', f'<@!{b.user.id}>']
+        return [b.default_prefix, f'<@{b.user.id}>', f'<@!{b.user.id}>']
+
+    @staticmethod
+    def hierarchy_check(member: discord.Member, user: Union[discord.Member, discord.User]):
+        if user == member:
+            return False
+        if isinstance(user, discord.Member):
+            if user == member.guild.owner or (not member.top_role > user.top_role and member.guild.owner != member) or \
+                    (not member.guild.me.top_role > user.top_role and member.guild.owner != member.guild.me):
+                return False
+
+        return True
+
     def __init__(self, **options):
         super().__init__(help_command=None, description=None, **options)
         self._secrets = secrets
         self._default_prefix = secrets['DEFAULT_PREFIX']
+        self.start_time = time.time()
 
     async def get_context(self, message, *, cls=None):
         return await super().get_context(message, cls=cls or CustomContext)
@@ -68,11 +89,7 @@ class CustomBot(commands.Bot):
                 return
             not_banned, banned = [], []
             for user in users:
-                if isinstance(user, discord.Member):
-                    if (not mod.top_role > user.top_role and self.guild.owner != mod) or user == self.guild.owner:
-                        not_banned.append(user)
-                        continue
-                if user == mod:
+                if not bot.hierarchy_check(mod, user):
                     not_banned.append(user)
                     continue
                 try:
@@ -90,8 +107,7 @@ class CustomBot(commands.Bot):
                 return
             not_kicked, kicked = [], []
             for user in users:
-                if (not mod.top_role > user.top_role and self.guild.owner != mod) \
-                        or user == self.guild.owner or user == mod:
+                if not bot.hierarchy_check(mod, user):
                     not_kicked.append(user)
                     continue
                 try:
@@ -122,8 +138,7 @@ class CustomBot(commands.Bot):
                 return
             muted, not_muted = [], []
             for user in users:
-                if (not mod.top_role > user.top_role and self.guild.owner != mod) \
-                        or user == self.guild.owner or user == mod:
+                if not bot.hierarchy_check(mod, user):
                     not_muted.append(user)
                     continue
                 try:
@@ -139,9 +154,9 @@ class CustomBot(commands.Bot):
             if not mod.guild_permissions.manage_roles or not self.mute:
                 return
             unmuted, not_unmuted = [], []
+
             for user in users:
-                if (not mod.top_role > user.top_role and self.guild.owner != mod) \
-                        or user == self.guild.owner or user == mod:
+                if not bot.hierarchy_check(mod, user):
                     not_unmuted.append(user)
                     continue
                 try:
@@ -152,6 +167,24 @@ class CustomBot(commands.Bot):
             if len(users) == len(not_unmuted):
                 raise CannotPunish('unmute', not_unmuted, mod)
             return unmuted, not_unmuted
+
+        async def multi_rename(self, mod: discord.Member, users: [discord.Member], nickname: str):
+            if not mod.guild_permissions.manage_nicknames:
+                return
+            renamed, not_renamed = [], []
+
+            for user in users:
+                if not bot.hierarchy_check(mod, user):
+                    not_renamed.append(user)
+                    continue
+                try:
+                    await user.edit(nick=nickname, reason=f'Changed by {mod}')
+                    renamed.append(user)
+                except (discord.Forbidden, discord.HTTPException):
+                    not_renamed.append(user)
+            if len(users) == len(not_renamed):
+                raise CannotPunish('unmute', not_renamed, mod)
+            return renamed, not_renamed
 
         async def log(self, embed: discord.Embed):
             if not self._logs:
@@ -204,8 +237,13 @@ class CustomBot(commands.Bot):
         if message.author.bot:
             return
 
+        if (await bot.get_context(message)).valid and message.guild:
+            if not message.channel.permissions_for(message.guild.me).embed_links:
+                return await message.channel.send(f":x: This bot needs the ``Embed Links`` "
+                                                  f"permission to function!")
+
         if message.content in [f"<@!{self.user.id}>", f"<@{self.user.id}>"]:
-            prefix = _get_prefix(self, message)
+            prefix = self._get_prefix(self, message)
             embed = embed_create(message.author, title='Pinged!', description=f'The current prefixes are '
                                                                               f'``{prefix[0]}`` and {bot.user.mention}')
             await message.channel.send(embed=embed)
@@ -245,6 +283,9 @@ class CustomContext(commands.Context):
     async def multi_unmute(self, *args):
         return await self._config.multi_unmute(*args)
 
+    async def multi_rename(self, *args):
+        return await self._config.multi_rename(*args)
+
     async def set_config(self, **kwargs):
         return await self._config.set_config(**kwargs)
 
@@ -271,15 +312,7 @@ class CustomContext(commands.Context):
         return self._config
 
 
-def _get_prefix(b, msg: discord.Message):
-    if not msg.guild:
-        return [b.default_prefix, f'<@{b.user.id}>', f'<@!{b.user.id}>']
-    if config := bot.get_config(msg.guild):
-        return [config.prefix, f'<@{b.user.id}>', f'<@!{b.user.id}>']
-    return [b.default_prefix, f'<@{b.user.id}>', f'<@!{b.user.id}>']
-
-
-bot = CustomBot(case_insensitive=True, intents=intents, command_prefix=_get_prefix,
+bot = CustomBot(case_insensitive=True, intents=intents, command_prefix=CustomBot._get_prefix,
                 activity=discord.Game(name='mod.help for help!'), strip_after_prefix=True, max_messages=10000)
 
 if __name__ == '__main__':

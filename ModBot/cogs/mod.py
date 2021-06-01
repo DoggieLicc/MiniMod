@@ -6,23 +6,35 @@ import discord
 from custom_funcs import *
 
 
-async def maybe_first_snipe_msg(ctx, channel):
+def maybe_first_snipe_msg(ctx):
     embed = embed_create(ctx.author, title='⚠ Warning!',
-                         description='That channel seems to be locked, and this channel'
-                         ' isn\'t. You should move to a private channel to avoid leaking sensitive information. '
-                         'However, you have permissions to snipe from that channel, so you may proceed with caution.',
+                         description='That channel seems to be locked, and this channel '
+                                     'isn\'t. You should move to a private channel to avoid leaking sensitive '
+                                     'information. However, you have permissions to snipe from that channel, '
+                                     'so you may proceed with caution.',
                          color=discord.Color.orange())
-    return await channel.send(embed=embed)
+    return embed
 
 
 class SnipeMenu(menus.ListPageSource):
-    def __init__(self, entries):
+    def __init__(self, entries, first_message: discord.Embed = None):
+        if first_message:
+            self.num_offset = 1
+            entries[:0] = [first_message]
+        else:
+            self.num_offset = 0
         super().__init__(entries, per_page=1)
 
     async def format_page(self, menu, entries):
-        index = menu.current_page + 1
+        if isinstance(entries, discord.Embed): return entries
+        index = menu.current_page + 1 - self.num_offset
         message = entries
-        embed = embed_create(menu.ctx.author, title=f'Sniped message {index}/{self._max_pages}:',
+
+        reply = message.reference
+        if reply: reply = reply.resolved
+        reply_deleted = isinstance(reply, discord.DeletedReferencedMessage)
+
+        embed = embed_create(menu.ctx.author, title=f'Sniped message {index}/{self._max_pages - self.num_offset}:',
                              description=f'{message.content}')
         embed.set_author(name=f'{message.author}: {message.author.id}', icon_url=message.author.avatar_url)
 
@@ -35,6 +47,13 @@ class SnipeMenu(menus.ListPageSource):
 
         embed.add_field(name=f'Message created at:', value=message.created_at.strftime('%A, %d %b %Y, %I:%M:%S %p UTC'),
                         inline=False)
+        if reply:
+            if reply_deleted:
+                msg = 'Replied message has been deleted.'
+            else:
+                msg = f'Replied to {reply.author} - [Link to replied message]({reply.jump_url} "Jump to Message")'
+            embed.add_field(name='Message reply:', value=msg)
+
         embed.add_field(name='Message channel:', value=message.channel.mention, inline=False)
         return embed
 
@@ -49,8 +68,8 @@ class ModCog(commands.Cog, name="Moderator Commands"):
     @commands.has_permissions(ban_members=True)
     @commands.command(usage='<users>... [reason]')
     async def ban(self, ctx, users: Greedy[Union[IntentionalMember, IntentionalUser]], *, reason: Optional[str]):
-        """Ban members who broke the rules! You can specify multiple members in one command
-        ,You can also ban users not in the guild using their ID!, You and this bot needs the "Ban Members" permission.
+        """Ban members who broke the rules! You can specify multiple members in one command.
+        You can also ban users not in the guild using their ID!, You and this bot needs the "Ban Members" permission.
         """
         if not users:
             embed = embed_create(ctx.author, title='Users not found!',
@@ -58,20 +77,19 @@ class ModCog(commands.Cog, name="Moderator Commands"):
                                              'Use their mention, name#tag, or ID.', color=discord.Color.red())
             return await ctx.send(embed=embed)
 
-        async with ctx.channel.typing():
+        async with ctx.channel.typing(): banned, not_banned = await ctx.multi_ban(ctx.author, users, reason)
 
-            banned, not_banned = await ctx.multi_ban(ctx.author, users, reason)
+        color = 0x46ff2e if not not_banned else 0xf9ff4d
 
-            color = 0x46ff2e if not not_banned else 0xf9ff4d
-
-            embed = embed_create(ctx.author, title=f'{len(banned)} user{"s" if len(banned) != 1 else ""} banned!'
-                                                   f"{' (Some users couldn’t be banned!)' if not_banned else ''}",
-                                 color=color)
-            embed.add_field(name=f'Banned user{"s" if len(banned) != 1 else ""}:', value=', '.join(map(str, banned)))
-            if not_banned:
-                embed.add_field(name=f'User{"s" if len(not_banned) != 1 else ""} not banned:',
-                                value=', '.join(map(str, not_banned)))
-            embed.add_field(name='Reason:', value=reason or "No reason specified", inline=False)
+        embed = embed_create(ctx.author, title=f'{len(banned)} user{"s" if len(banned) != 1 else ""} banned!'
+                                               f"{' (Some users couldn’t be banned!)' if not_banned else ''}",
+                             color=color)
+        embed.add_field(name=f'Banned user{"s" if len(banned) != 1 else ""}:',
+                        value=', '.join(map(str, banned[:50])))
+        if not_banned:
+            embed.add_field(name=f'User{"s" if len(not_banned) != 1 else ""} not banned:',
+                            value=', '.join(map(str, not_banned[:50])))
+        embed.add_field(name='Reason:', value=reason or "No reason specified", inline=False)
 
         await ctx.send(embed=embed)
 
@@ -89,20 +107,19 @@ class ModCog(commands.Cog, name="Moderator Commands"):
                                              'Use their mention or ID.', color=discord.Color.red())
             return await ctx.send(embed=embed)
 
-        async with ctx.channel.typing():
+        async with ctx.channel.typing(): unbanned, not_unbanned = await ctx.multi_unban(ctx.author, users, reason)
 
-            unbanned, not_unbanned = await ctx.multi_unban(ctx.author, users, reason)
+        color = 0x46ff2e if not not_unbanned else 0xf9ff4d
 
-            color = 0x46ff2e if not not_unbanned else 0xf9ff4d
-
-            embed = embed_create(ctx.author, title=f'{len(unbanned)} user{"s" if len(unbanned) != 1 else ""} unbanned!'
-                                                   f"{' (Some users couldn’t be unbanned!)' if not_unbanned else ''}",
-                                 color=color)
-            embed.add_field(name=f'Unbanned user{"s" if len(unbanned) != 1 else ""}:', value=', '.join(map(str, unbanned)))
-            if not_unbanned:
-                embed.add_field(name=f'User{"s" if len(not_unbanned) != 1 else ""} not unbanned:',
-                                value=', '.join(map(str, not_unbanned)))
-            embed.add_field(name='Reason:', value=reason or "No reason specified", inline=False)
+        embed = embed_create(ctx.author, title=f'{len(unbanned)} user{"s" if len(unbanned) != 1 else ""} unbanned!'
+                                               f"{' (Some users couldn’t be unbanned!)' if not_unbanned else ''}",
+                             color=color)
+        embed.add_field(name=f'Unbanned user{"s" if len(unbanned) != 1 else ""}:',
+                        value=', '.join(map(str, unbanned[:50])))
+        if not_unbanned:
+            embed.add_field(name=f'User{"s" if len(not_unbanned) != 1 else ""} not unbanned:',
+                            value=', '.join(map(str, not_unbanned[:50])))
+        embed.add_field(name='Reason:', value=reason or "No reason specified", inline=False)
 
         await ctx.send(embed=embed)
 
@@ -125,17 +142,18 @@ class ModCog(commands.Cog, name="Moderator Commands"):
             banned, not_banned = await ctx.multi_ban(ctx.author, users, f'Softban: {reason}')
             unbanned, not_unbanned = await ctx.multi_unban(ctx.author, banned, f'Softban: {reason}')
 
-            color = 0x46ff2e if not unbanned else 0xf9ff4d
+        color = 0x46ff2e if not unbanned else 0xf9ff4d
 
-            embed = embed_create(ctx.author, title=f'{len(unbanned)} user{"s" if len(unbanned) != 1 else ""} softbanned!'
-                                                   f"{' (Some users couldn’t be softbanned!)' if not_unbanned else ''}",
-                                 color=color)
-            embed.add_field(name=f'Softbanned user{"s" if len(unbanned) != 1 else ""}:',
-                            value=', '.join(map(str, unbanned)))
-            if not_banned:
-                embed.add_field(name=f'User{"s" if len(not_banned) != 1 else ""} not softbanned:',
-                                value=', '.join(map(str, not_banned)))
-            embed.add_field(name='Reason:', value=reason, inline=False)
+        embed = embed_create(ctx.author,
+                             title=f'{len(unbanned)} user{"s" if len(unbanned) != 1 else ""} softbanned!'
+                                   f"{' (Some users couldn’t be softbanned!)' if not_unbanned else ''}",
+                             color=color)
+        embed.add_field(name=f'Softbanned user{"s" if len(unbanned) != 1 else ""}:',
+                        value=', '.join(map(str, unbanned[:50])))
+        if not_banned:
+            embed.add_field(name=f'User{"s" if len(not_banned) != 1 else ""} not softbanned:',
+                            value=', '.join(map(str, not_banned[:50])))
+        embed.add_field(name='Reason:', value=reason, inline=False)
 
         await ctx.send(embed=embed)
 
@@ -153,20 +171,51 @@ class ModCog(commands.Cog, name="Moderator Commands"):
                                              'Use their mention, name#tag, or ID.', color=discord.Color.red())
             return await ctx.send(embed=embed)
 
-        async with ctx.channel.typing():
+        async with ctx.channel.typing(): kicked, not_kicked = await ctx.multi_kick(ctx.author, users, reason)
 
-            kicked, not_kicked = await ctx.multi_kick(ctx.author, users, reason)
+        color = 0x46ff2e if not not_kicked else 0xf9ff4d
 
-            color = 0x46ff2e if not not_kicked else 0xf9ff4d
+        embed = embed_create(ctx.author, title=f'{len(kicked)} user{"s" if len(kicked) != 1 else ""} kicked!'
+                                               f"{' (Some users couldn’t be kicked!)' if not_kicked else ''}",
+                             color=color)
+        embed.add_field(name=f'Kicked user{"s" if len(kicked) != 1 else ""}:',
+                        value=', '.join(map(str, kicked[:50])))
+        if not_kicked:
+            embed.add_field(name=f'User{"s" if len(kicked) != 1 else ""} not kicked:',
+                            value=', '.join(map(str, not_kicked[:50])))
+        embed.add_field(name='Reason:', value=reason or "No reason specified", inline=False)
 
-            embed = embed_create(ctx.author, title=f'{len(kicked)} user{"s" if len(kicked) != 1 else ""} kicked!'
-                                                   f"{' (Some users couldn’t be kicked!)' if not_kicked else ''}",
-                                 color=color)
-            embed.add_field(name=f'Kicked user{"s" if len(kicked) != 1 else ""}:', value=', '.join(map(str, kicked)))
-            if not_kicked:
-                embed.add_field(name=f'User{"s" if len(kicked) != 1 else ""} not kicked:',
-                                value=', '.join(map(str, not_kicked)))
-            embed.add_field(name='Reason:', value=reason or "No reason specified", inline=False)
+        await ctx.send(embed=embed)
+
+    @commands.guild_only()
+    @commands.bot_has_permissions(manage_nicknames=True)
+    @commands.has_permissions(manage_nicknames=True)
+    @commands.command(aliases=['nick', 'nickname'])
+    async def rename(self, ctx, members: Greedy[IntentionalMember], *, nickname):
+        if not members:
+            embed = embed_create(ctx.author, title='Members not found!',
+                                 description='Either no members were specified, or they weren\'t found.\n'
+                                             'Use their mention, name#tag, or ID.', color=discord.Color.red())
+            return await ctx.send(embed=embed)
+
+        if len(nickname) > 32:
+            embed = embed_create(ctx.author, title='Nickname too long!',
+                                 description=f'The nickname {nickname[:100]} is too long! (32 chars max.)')
+            return await ctx.send(embed=embed)
+
+        async with ctx.channel.typing(): renamed, not_renamed = await ctx.multi_rename(ctx.author, members, nickname)
+        
+        color = 0x46ff2e if not not_renamed else 0xf9ff4d
+
+        embed = embed_create(ctx.author, title=f'{len(renamed)} user{"s" if len(renamed) != 1 else ""} renamed!'
+                                               f"{' (Some users couldn’t be renamed!)' if not_renamed else ''}",
+                             color=color)
+        embed.add_field(name=f'Renamed user{"s" if len(renamed) != 1 else ""}:',
+                        value=', '.join(map(str, renamed[:50])))
+        if not_renamed:
+            embed.add_field(name=f'User{"s" if len(renamed) != 1 else ""} not renamed:',
+                            value=', '.join(map(str, not_renamed[:50])))
+        embed.add_field(name='New nickname:', value=nickname, inline=False)
 
         await ctx.send(embed=embed)
 
@@ -207,32 +256,33 @@ class ModCog(commands.Cog, name="Moderator Commands"):
         channel to get messages from, if no channel is specified it will get messages from the current channel.
         You can only snipe messages from channels in which you have `Manage Messages` and `View Channel` in."""
 
+        channel = channel or ctx.channel
+
+        if not ((channel.permissions_for(ctx.author).manage_messages and
+                 channel.permissions_for(ctx.author).view_channel) or ctx.author.id == 203161760297910273):
+            embed = embed_create(ctx.author, title='Can\'t snipe from that channel!',
+                                 description='You need permissions to view and manage messages of that channel '
+                                             'before you can snipe messages from it!', color=discord.Color.red())
+            return await ctx.send(embed=embed)
+
         async with ctx.channel.typing():
-
-            channel = channel or ctx.channel
-
-            if not ((channel.permissions_for(ctx.author).manage_messages and
-                    channel.permissions_for(ctx.author).view_channel) or ctx.author.id == 203161760297910273):
-                embed = embed_create(ctx.author, title='Can\'t snipe from that channel!',
-                                     description='You need permissions to view and manage messages of that channel '
-                                                 'before you can snipe messages from it!', color=discord.Color.red())
-                return await ctx.send(embed=embed)
-
             filtered = [message for message in self.bot.sniped if (message.guild == ctx.guild)
                         and (user is None or user == message.author) and (channel == message.channel)][:100]
 
-            if not filtered:
-                embed = embed_create(ctx.author, title='No messages found!',
-                                     description=f'No sniped messages were found for {user or "this guild"}'
-                                                 f'{f" in {channel.mention}" or ""}', color=discord.Color.red())
-                return await ctx.send(embed=embed)
+        if not filtered:
+            embed = embed_create(ctx.author, title='No messages found!',
+                                 description=f'No sniped messages were found for {user or "this guild"}'
+                                             f'{f" in {channel.mention}" or ""}', color=discord.Color.red())
+            return await ctx.send(embed=embed)
 
         pages = CustomMenu(source=SnipeMenu(filtered), clear_reactions_after=True)
         if (channel.overwrites_for(ctx.guild.default_role).view_channel == False and
                 ctx.channel.overwrites_for(ctx.guild.default_role).view_channel != False):
-            pages.send_initial_message = maybe_first_snipe_msg
+            pages = CustomMenu(source=SnipeMenu(filtered, maybe_first_snipe_msg(ctx)), clear_reactions_after=True)
         await pages.start(ctx)
-        await self.bot.wait_for('finalize_menu', check=lambda c: c == ctx)
+
+        if len(filtered) > 1:
+            await self.bot.wait_for('finalize_menu', check=lambda c: c == ctx)
 
     @commands.guild_only()
     @commands.bot_has_permissions(manage_roles=True)
@@ -252,10 +302,10 @@ class ModCog(commands.Cog, name="Moderator Commands"):
         embed = embed_create(ctx.author, title=f'{len(muted)} user{"s" if len(muted) != 1 else ""} muted!'
                                                f"{' (Some users couldn’t be muted!)' if not_muted else ''}",
                              color=color)
-        embed.add_field(name=f'Muted user{"s" if len(muted) != 1 else ""}:', value=', '.join(map(str, muted)))
+        embed.add_field(name=f'Muted user{"s" if len(muted) != 1 else ""}:', value=', '.join(map(str, muted[:50])))
         if not_muted:
             embed.add_field(name=f'User{"s" if len(muted) != 1 else ""} not muted:',
-                            value=', '.join(map(str, not_muted)))
+                            value=', '.join(map(str, not_muted[:50])))
         embed.add_field(name='Reason:', value=reason or "No reason specified", inline=False)
 
         await ctx.send(embed=embed)
@@ -278,10 +328,11 @@ class ModCog(commands.Cog, name="Moderator Commands"):
         embed = embed_create(ctx.author, title=f'{len(unmuted)} user{"s" if len(unmuted) != 1 else ""} unmuted!'
                                                f"{' (Some users couldn’t be unmuted!)' if not_unmuted else ''}",
                              color=color)
-        embed.add_field(name=f'unmuted user{"s" if len(unmuted) != 1 else ""}:', value=', '.join(map(str, unmuted)))
+        embed.add_field(name=f'unmuted user{"s" if len(unmuted) != 1 else ""}:',
+                        value=', '.join(map(str, unmuted[:50])))
         if not_unmuted:
             embed.add_field(name=f'User{"s" if len(unmuted) != 1 else ""} not unmuted:',
-                            value=', '.join(map(str, not_unmuted)))
+                            value=', '.join(map(str, not_unmuted[:50])))
         embed.add_field(name='Reason:', value=reason or "No reason specified", inline=False)
 
         await ctx.send(embed=embed)

@@ -4,25 +4,28 @@ from custom_funcs import *
 
 
 class HelpCog(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
+    def __init__(self, _bot):
+        self.bot = _bot
         help_attributes = {
             'help': 'Displays help for the bot\'s commands... duh',
             'hidden': True,
             'aliases': ['h', 'command', 'commands', 'cmd', 'cmds']
         }
         help_obj = MyHelp(command_attrs=help_attributes, verify_checks=False)
-        bot.help_command = help_obj
+        _bot.help_command = help_obj
         print('HelpCog init')
 
 
 class MyHelp(commands.HelpCommand):
     def get_command_signature(self, command):
-        return '%s%s %s' % (self.clean_prefix, command.qualified_name, command.signature)
+        return '%s %s' % (command.qualified_name, command.signature)
 
     async def send_bot_help(self, mapping):
         embed = embed_create(self.context.author, title='Help:',
-                             description=f'`{self.clean_prefix}help [command]` for command info\n'
+                             description=f'The current prefixes are '
+                                         f'`{self.context.bot._get_prefix(self.context.bot, self.context.message)[0]}` '
+                                         f'and {self.context.bot.user.mention}\n\n'
+                                         f'`{self.clean_prefix}help [command]` for command info\n'
                                          f'`<arg>` - Required argument\n'
                                          f'`[arg]` - Optional argument\n'
                                          f'`[arg=10]` - Optional argument, `10` is default\n'
@@ -30,10 +33,9 @@ class MyHelp(commands.HelpCommand):
         for cog, command in mapping.items():
             _filtered = []
             for c in command:
+                _filtered.append(c)
                 if isinstance(c, commands.Group):
                     [_filtered.append(subc) for subc in c.commands]
-                else:
-                    _filtered.append(c)
 
             filtered = await self.filter_commands(_filtered, sort=True)
             command_signatures = [self.get_command_signature(c) for c in filtered]
@@ -41,8 +43,7 @@ class MyHelp(commands.HelpCommand):
                 cog_name = getattr(cog, 'qualified_name', 'Other')
                 embed.add_field(name=cog_name, value='\n'.join(command_signatures), inline=False)
 
-        channel = self.get_destination()
-        await channel.send(embed=embed)
+        await self.get_destination().send(embed=embed)
 
     async def send_command_help(self, command):
         embed = embed_create(self.context.author, title=self.get_command_signature(command))
