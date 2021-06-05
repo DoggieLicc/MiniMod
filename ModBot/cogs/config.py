@@ -73,6 +73,27 @@ class ConfigCog(commands.Cog, name='Configuration Commands'):
                                          f"This role will be added to members when the ``mute`` command is used!")
         await ctx.send(embed=embed)
 
+    @commands.guild_only()
+    @commands.has_permissions(manage_guild=True)
+    @config.command(usage="<on|off>")
+    async def snipe(self, ctx, option: Union[bool, str]):
+        """Turns on or off the snipe feature, which temporarily stores deleted messages"""
+        if isinstance(option, str):
+            embed = embed_create(ctx.author, title="Invalid option specified!",
+                                 description="You need to specify 'on' or 'off'!",
+                                 color=discord.Color.red())
+            return await ctx.send(embed=embed)
+
+        await ctx.set_config(snipe=option)
+
+        if not option:
+            self.bot.sniped = [msg for msg in self.bot.sniped if msg.guild != ctx.guild]
+
+        embed = embed_create(ctx.author, title="Snipe command " + ("enabled!" if option else "disabled!"),
+                             description=f"The snipe feature has been " + ("enabled!" if option else "disabled!") +
+                                         f" This will " + ("enable" if option else "disable") + " the `snipe` command!")
+        await ctx.send(embed=embed)
+
 
 def setup(bot):
     bot.add_cog(ConfigCog(bot))

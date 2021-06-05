@@ -79,9 +79,7 @@ class UtilityCog(commands.Cog, name="Utility Commands"):
             pages = CustomMenu(source=RecentJoinsMenu(members, per_page=5), clear_reactions_after=True)
 
         await pages.start(ctx)
-
-        async with ctx.channel.typing():
-            await self.bot.wait_for('finalize_menu', check=lambda c: c == ctx)
+        await self.bot.wait_for('finalize_menu', check=lambda c: c == ctx)
 
     @commands.max_concurrency(5, commands.BucketType.user)
     @commands.guild_only()
@@ -204,23 +202,22 @@ React with :tada: to participate!
 
         if command == 'help':
             src = type(self.bot.help_command)
-            filename = inspect.getsourcefile(src)
         else:
-            obj = self.bot.get_command(command.replace('.', ' '))
+            obj = self.bot.get_command(command.replace('.', ' ').lower())
             if obj is None:
                 embed = embed_create(ctx.author, title='Command not found!',
-                                     description='This command wasn\'t found in this bot.')
+                                     description='This command wasn\'t found in this bot.',
+                                     color=discord.Color.red())
                 return await ctx.send(embed=embed)
 
             src = obj.callback.__code__
-            filename = src.co_filename
 
         lines, _ = inspect.getsourcelines(src)
-        code = ''.join(lines)
+        src_code = ''.join(lines)
 
-        buffer = StringIO(code)
+        buffer = StringIO(src_code)
 
-        file = discord.File(fp=buffer, filename=filename)
+        file = discord.File(fp=buffer, filename=f'{command.replace(" ", "_").lower()}.py')
 
         await ctx.send(f"Here you go, {ctx.author.mention}. (You should view this on a PC)", file=file)
 

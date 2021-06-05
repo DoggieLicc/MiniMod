@@ -63,23 +63,26 @@ class CustomBot(commands.Bot):
 
     class GuildConfig(object):
         def __init__(self, guild: discord.Guild, logs: discord.TextChannel = None,
-                     prefix: str = None, mute: discord.Role = None):
+                     prefix: str = None, mute: discord.Role = None, snipe: bool = False):
             self._guild = guild
             self._logs = logs
             self._prefix = prefix or bot.default_prefix
             self._mute = mute
+            self._snipe = snipe
 
         async def set_config(self, **kwargs):
             self._logs = kwargs.get('logs', self._logs)
             self._prefix = kwargs.get('prefix', self._prefix)
             self._mute = kwargs.get('mute', self._mute)
+            self._snipe = kwargs.get('snipe', self._snipe)
 
             async with bot.db.cursor() as cursor:
-                await cursor.execute('REPLACE INTO config VALUES(?, ?, ?, ?)',
+                await cursor.execute('REPLACE INTO config VALUES(?, ?, ?, ?, ?)',
                                      (self._guild.id,
                                       self._logs.id if self._logs else None,
                                       self._prefix,
-                                      self._mute.id if self._mute else None))
+                                      self._mute.id if self._mute else None,
+                                      self._snipe))
                 await bot.db.commit()
             await bot.load_all_configs()
             return self
@@ -211,6 +214,10 @@ class CustomBot(commands.Bot):
         def mute(self):
             return self._mute
 
+        @property
+        def snipe(self):
+            return self._snipe
+
     def get_config(self, guild: discord.Guild):
         if not isinstance(guild, discord.Guild):
             return None
@@ -228,7 +235,8 @@ class CustomBot(commands.Bot):
                 log_channel = guild.get_channel(row[1])
                 prefix = row[2]
                 mute = guild.get_role(row[3])
-                guild_configs.append(bot.GuildConfig(guild, log_channel, prefix, mute))
+                snipe = bool(row[4])
+                guild_configs.append(bot.GuildConfig(guild, log_channel, prefix, mute, snipe))
 
         self.configs = guild_configs
         return guild_configs
@@ -306,6 +314,10 @@ class CustomContext(commands.Context):
     @property
     def mute(self):
         return self._config.mute
+
+    @property
+    def snipe(self):
+        return self._config.snipe
 
     @property
     def config(self):

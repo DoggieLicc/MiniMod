@@ -131,7 +131,6 @@ class DevCog(commands.Cog):
                     self._last_result = str(ret)[:1900]
                     embed = discord.Embed(title='Exec result:', description=f'```py\n{value}{ret}\n```')
 
-
         await ctx.send(embed=embed)
 
     @dev.command(hidden=True)
@@ -144,17 +143,6 @@ class DevCog(commands.Cog):
         msg.content = ctx.prefix + command
         new_ctx = await self.bot.get_context(msg, cls=type(ctx))
         await self.bot.invoke(new_ctx)
-
-    @commands.command(hidden=True)
-    async def tti_disco(self, ctx, tti_code: str, block: str = "g"):
-        block = BetterCycle(block)
-        code_segments = [segment + "0" * (5 - len(segment)) for segment in tti_code.split(" ")]
-        bottom_layer = ["0", "ex8"] + ["0e" + segment.replace("0", "e").replace("1", "#") + "e" for segment in
-                                       code_segments] + ["ex8"]
-        top_layer = [f"{next(block)}x9"] + [f"{next(block)}rx7{block.current}" for segment in bottom_layer[:-1]] + [
-            f"{next(block)}x9"]
-
-        await ctx.send(f"`j;iso {' '.join(bottom_layer)} - {' '.join(top_layer)} gif`")
 
 
 def setup(bot):

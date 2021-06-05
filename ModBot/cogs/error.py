@@ -1,3 +1,5 @@
+from io import StringIO
+
 import discord.ext.commands as err
 
 import discord
@@ -24,8 +26,7 @@ class ErrorCog(err.Cog):
             embed.add_field(name='You don\'t have permissions for this command!:',
                             value='You need the `Manage Messages` permission!')
         elif isinstance(error, err.errors.NotOwner):
-            return await ctx.send(
-                content='no')
+            return await ctx.send('no')
         elif isinstance(error, err.CommandOnCooldown):
             embed.add_field(name='Cooldown!:', value=str(error))
         elif isinstance(error, CannotPunish):
@@ -45,15 +46,20 @@ class ErrorCog(err.Cog):
         elif isinstance(error, err.errors.MaxConcurrencyReached):
             return
         else:
+            etype = type(error)
+            trace = error.__traceback__
+            lines = traceback.format_exception(etype, error, trace)
+            traceback_t = ''.join(lines)
+            buffer = StringIO(traceback_t)
+            file = discord.File(buffer, filename='traceback.py')
+
             owner = self.bot.get_user(203161760297910273)
-            embed = discord.Embed(title="Unhandled Error!",
-                                  description=f"```py\n{traceback.format_tb(error.__traceback__)[0].strip()}\n```")
-            embed.add_field(name="Error:", value=f"{error.original.__class__.__name__}: "
-                                                 f"{error.original}", inline=False)
+            embed.add_field(name="Unhandled Error!:", value=f"{error}", inline=False)
             embed.add_field(name="Message content:", value=ctx.message.content, inline=False)
             embed.add_field(name="Extra Info:", value=f"Guild: {ctx.guild}: {ctx.guild.id if ctx.guild else 'None'}\n"
                                                       f"Channel: {ctx.channel}:", inline=False)
-            return await owner.send(embed=embed)
+            await owner.send(file=file, embed=embed)
+            return
 
         await ctx.send(embed=embed)
 

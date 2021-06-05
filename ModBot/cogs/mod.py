@@ -77,7 +77,8 @@ class ModCog(commands.Cog, name="Moderator Commands"):
                                              'Use their mention, name#tag, or ID.', color=discord.Color.red())
             return await ctx.send(embed=embed)
 
-        async with ctx.channel.typing(): banned, not_banned = await ctx.multi_ban(ctx.author, users, reason)
+        async with ctx.channel.typing():
+            banned, not_banned = await ctx.multi_ban(ctx.author, users, reason)
 
         color = 0x46ff2e if not not_banned else 0xf9ff4d
 
@@ -107,7 +108,8 @@ class ModCog(commands.Cog, name="Moderator Commands"):
                                              'Use their mention or ID.', color=discord.Color.red())
             return await ctx.send(embed=embed)
 
-        async with ctx.channel.typing(): unbanned, not_unbanned = await ctx.multi_unban(ctx.author, users, reason)
+        async with ctx.channel.typing():
+            unbanned, not_unbanned = await ctx.multi_unban(ctx.author, users, reason)
 
         color = 0x46ff2e if not not_unbanned else 0xf9ff4d
 
@@ -171,7 +173,8 @@ class ModCog(commands.Cog, name="Moderator Commands"):
                                              'Use their mention, name#tag, or ID.', color=discord.Color.red())
             return await ctx.send(embed=embed)
 
-        async with ctx.channel.typing(): kicked, not_kicked = await ctx.multi_kick(ctx.author, users, reason)
+        async with ctx.channel.typing():
+            kicked, not_kicked = await ctx.multi_kick(ctx.author, users, reason)
 
         color = 0x46ff2e if not not_kicked else 0xf9ff4d
 
@@ -203,8 +206,9 @@ class ModCog(commands.Cog, name="Moderator Commands"):
                                  description=f'The nickname {nickname[:100]} is too long! (32 chars max.)')
             return await ctx.send(embed=embed)
 
-        async with ctx.channel.typing(): renamed, not_renamed = await ctx.multi_rename(ctx.author, members, nickname)
-        
+        async with ctx.channel.typing():
+            renamed, not_renamed = await ctx.multi_rename(ctx.author, members, nickname)
+
         color = 0x46ff2e if not not_renamed else 0xf9ff4d
 
         embed = embed_create(ctx.author, title=f'{len(renamed)} user{"s" if len(renamed) != 1 else ""} renamed!'
@@ -222,6 +226,7 @@ class ModCog(commands.Cog, name="Moderator Commands"):
     @commands.guild_only()
     @commands.bot_has_permissions(manage_messages=True)
     @commands.has_permissions(manage_messages=True)
+    @commands.max_concurrency(1, per=commands.BucketType.channel, wait=True)
     @commands.command(aliases=['clear'])
     async def purge(self, ctx, users: Greedy[Union[IntentionalMember, IntentionalUser]], amount=20):
         """Deletes multiple messages from the current channel, you can specify users that it will delete messages from.
@@ -256,10 +261,18 @@ class ModCog(commands.Cog, name="Moderator Commands"):
         channel to get messages from, if no channel is specified it will get messages from the current channel.
         You can only snipe messages from channels in which you have `Manage Messages` and `View Channel` in."""
 
+        if not ctx.snipe:
+            embed = embed_create(ctx.author,
+                                 title='Snipe is disabled in this guild!',
+                                 description='The snipe command is now opt-in only, use `config snipe on` '
+                                             'to enable sniping in this guild!',
+                                 color=discord.Color.red())
+            return await ctx.send(embed=embed)
+
         channel = channel or ctx.channel
 
-        if not ((channel.permissions_for(ctx.author).manage_messages and
-                 channel.permissions_for(ctx.author).view_channel) or ctx.author.id == 203161760297910273):
+        if not (channel.permissions_for(ctx.author).manage_messages and
+                channel.permissions_for(ctx.author).view_channel):
             embed = embed_create(ctx.author, title='Can\'t snipe from that channel!',
                                  description='You need permissions to view and manage messages of that channel '
                                              'before you can snipe messages from it!', color=discord.Color.red())

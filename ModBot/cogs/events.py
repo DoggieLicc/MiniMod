@@ -81,8 +81,10 @@ class EventsCog(commands.Cog):
     @commands.Cog.listener()
     async def on_message_delete(self, message):
         if message.guild and not message.author.bot:
-            self.bot.sniped[:0] = [message]
-            self.bot.sniped = self.bot.sniped[:5000]
+            ctx = await self.bot.get_context(message)
+            if ctx.snipe:
+                self.bot.sniped[:0] = [message]
+                self.bot.sniped = self.bot.sniped[:5000]
 
 
 def setup(bot):
