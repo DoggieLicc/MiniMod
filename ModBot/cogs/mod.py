@@ -228,7 +228,7 @@ class ModCog(commands.Cog, name="Moderator Commands"):
     @commands.has_permissions(manage_messages=True)
     @commands.max_concurrency(1, per=commands.BucketType.channel, wait=True)
     @commands.command(aliases=['clear'])
-    async def purge(self, ctx, users: Greedy[Union[IntentionalMember, IntentionalUser]], amount=20):
+    async def purge(self, ctx, users: Greedy[Union[IntentionalMember, IntentionalUser]], amount: Optional[int] = 20):
         """Deletes multiple messages from the current channel, you can specify users that it will delete messages from.
         You can also specify the amount of messages to check. You and this bot needs the "Manage Messages" permission"""
 
@@ -302,6 +302,9 @@ class ModCog(commands.Cog, name="Moderator Commands"):
     @commands.has_permissions(manage_roles=True)
     @commands.command(usage='<users>... [reason]')
     async def mute(self, ctx, users: Greedy[IntentionalMember], *, reason: Optional[str]):
+        """Adds the mute role to the members specified. You can also add a reason!
+        You must have a mute role configured in order to use this command!
+        You and this bot needs the "Manage ROles" permission!"""
         if not users:
             raise discord.ext.commands.MissingRequiredArgument(ctx.author)
         if not ctx.mute:

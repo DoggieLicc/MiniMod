@@ -198,6 +198,12 @@ class CustomBot(commands.Bot):
             except (discord.HTTPException, discord.Forbidden) as e:
                 print(e)
 
+        async def delete(self):
+            async with bot.db.cursor() as cursor:
+                await cursor.execute('DELETE FROM config WHERE guild_id = (?)', (self.guild.id,))
+
+            await bot.db.commit()
+
         @property
         def guild(self):
             return self._guild
@@ -331,5 +337,16 @@ if __name__ == '__main__':
     for file in os.listdir('./cogs'):
         if file.endswith('.py'):
             bot.load_extension(f'cogs.{file[:-3]}')
+
+
+@bot.event
+async def on_guild_remove(guild):
+
+    if not guild: return
+    bot.sniped = [msg for msg in bot.sniped if msg.guild != guild]
+    config = bot.get_config(guild)
+    if not config: return
+
+    await config.delete()
 
 bot.run(bot.secrets['BOT_TOKEN'], bot=True, reconnect=True)

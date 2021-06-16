@@ -81,7 +81,7 @@ class UtilityCog(commands.Cog, name="Utility Commands"):
         await pages.start(ctx)
         await self.bot.wait_for('finalize_menu', check=lambda c: c == ctx)
 
-    @commands.max_concurrency(5, commands.BucketType.user)
+    @commands.max_concurrency(3, commands.BucketType.channel)
     @commands.guild_only()
     @commands.command(aliases=['bottest', 'selfbottest', 'bt', 'sbt'])
     async def selfbot(self, ctx, users: Greedy[discord.Member]):
@@ -102,7 +102,7 @@ React with :tada: to participate!
             reaction, user = await self.bot.wait_for("reaction_add", timeout=600,
                                                      check=lambda _reaction, _user: _reaction.message == message and (
                                                              not _user.bot and not users) or _user in users
-                                                                                    and _reaction.emoji == '\N{PARTY POPPER}')
+                                                     and _reaction.emoji == '\N{PARTY POPPER}')
         except asyncio.TimeoutError:
 
             embed = embed_create(ctx.author, title='Test timed out!',
@@ -226,7 +226,7 @@ React with :tada: to participate!
         if isinstance(error, commands.MaxConcurrencyReached):
             embed = embed_create(ctx.author, title=f'Error!', color=0xeb4034)
             embed.add_field(name='Too many tests running!',
-                            value=f'You can only have {error.number} tests running at the same time!')
+                            value=f'You can only have {error.number} tests running at the same time in this channel!')
             await ctx.send(embed=embed)
 
     @recentjoins.error
