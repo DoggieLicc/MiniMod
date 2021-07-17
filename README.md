@@ -1,3 +1,8 @@
+# Invite this bot!
+
+https://discord.com/oauth2/authorize?client_id=829104096324616192&permissions=402680006&scope=bot
+
+
 # Mini Mod
 Moderation bot with easy to use commands, but still quite useful for any server. To see a list of commands, use `mod.help`
 
