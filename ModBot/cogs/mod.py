@@ -3,6 +3,7 @@ from discord.ext.commands import Greedy
 
 from typing import Union, Optional
 import discord
+
 from custom_funcs import *
 
 
@@ -45,7 +46,7 @@ class SnipeMenu(menus.ListPageSource):
             file_urls = [f'[{file.filename}]({file.proxy_url})' for file in message.attachments]
             embed.add_field(name='Deleted files:', value=f'\n'.join(file_urls))
 
-        embed.add_field(name=f'Message created at:', value=message.created_at.strftime('%A, %d %b %Y, %I:%M:%S %p UTC'),
+        embed.add_field(name=f'Message created at:', value=user_friendly_dt(message.created_at),
                         inline=False)
         if reply:
             if reply_deleted:

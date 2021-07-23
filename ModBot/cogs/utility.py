@@ -1,7 +1,7 @@
 from discord.ext import commands, menus
 from discord.ext.commands import Greedy
 
-from typing import Union
+from typing import Union, Optional
 import discord
 from custom_funcs import *
 import time
@@ -18,8 +18,8 @@ class RecentJoinsMenu(menus.ListPageSource):
         embed = embed_create(menu.ctx.author, title=f'Showing recent joins for {menu.ctx.guild} '
                                                     f'({index}/{self._max_pages}):')
         for member in entries:
-            joined_at = member.joined_at.strftime("%A, %d %b %Y, %I:%M:%S %p UTC")
-            created_at = member.created_at.strftime("%A, %d %b %Y, %I:%M:%S %p UTC")
+            joined_at = user_friendly_dt(member.joined_at)
+            created_at = user_friendly_dt(member.created_at)
             embed.add_field(name=f'{member}', value=f'ID: {member.id}\n'
                                                     f'Joined at: {joined_at}\n'
                                                     f'Created at: {created_at}', inline=False)
@@ -49,8 +49,10 @@ class UtilityCog(commands.Cog, name="Utility Commands"):
         print('UtilityCog init')
 
     @commands.command()
-    async def user(self, ctx, *, user: Union[discord.Member, discord.User]):
+    async def user(self, ctx, *, user: Optional[Union[discord.Member, discord.User]]):
         """Displays some information about an user, if they are in the server, then the join date is available."""
+
+        user = user or ctx.author
 
         embed = embed_create(ctx.author, title=f'Info for {user}:', description=user.mention)
         embed.set_thumbnail(url=user.avatar_url)
@@ -59,12 +61,12 @@ class UtilityCog(commands.Cog, name="Utility Commands"):
         embed.add_field(name='Bot?', value='Yes' if user.bot else 'No')
 
         embed.add_field(name='Creation Date',
-                        value=user.created_at.strftime("%A, %d %b %Y, %I:%M:%S %p UTC"),
+                        value=user_friendly_dt(user.created_at),
                         inline=False)
 
         if isinstance(user, discord.Member):
             embed.add_field(name='Server Join Date',
-                            value=user.joined_at.strftime("%A, %d %b %Y, %I:%M:%S %p UTC"),
+                            value=user_friendly_dt(user.joined_at),
                             inline=False)
 
         await ctx.send(embed=embed)
@@ -102,7 +104,7 @@ React with :tada: to participate!
             reaction, user = await self.bot.wait_for("reaction_add", timeout=600,
                                                      check=lambda _reaction, _user: _reaction.message == message and (
                                                              not _user.bot and not users) or _user in users
-                                                     and _reaction.emoji == '\N{PARTY POPPER}')
+                                                                                    and _reaction.emoji == '\N{PARTY POPPER}')
         except asyncio.TimeoutError:
 
             embed = embed_create(ctx.author, title='Test timed out!',

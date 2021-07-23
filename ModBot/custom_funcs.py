@@ -1,8 +1,19 @@
+import datetime
+from typing import Optional, Literal
+
 import discord
 import re
 from discord.ext import commands, menus
 
-__all__ = ["CannotPunish", "embed_create", "TimeConverter", "IntentionalUser", "IntentionalMember", "CustomMenu"]
+__all__ = [
+    "CannotPunish",
+    "embed_create",
+    "TimeConverter",
+    "IntentionalUser",
+    "IntentionalMember",
+    "CustomMenu",
+    "user_friendly_dt"
+]
 
 
 class CannotPunish(commands.CommandError):
@@ -157,3 +168,15 @@ class CustomMenu(menus.MenuPages):
 
     def call_end_event(self):
         self.bot.dispatch('finalize_menu', self.ctx)
+
+
+TimestampStyle = Literal['f', 'F', 'd', 'D', 't', 'T', 'R']
+
+
+def format_dt(dt: datetime.datetime, /, style: Optional[TimestampStyle] = None) -> str:
+    if style is None: return f'<t:{int(dt.timestamp())}>'
+    return f'<t:{int(dt.timestamp())}:{style}>'
+
+
+def user_friendly_dt(dt: datetime.datetime):
+    return format_dt(dt, style='f') + f' ({format_dt(dt, style="R")})'
