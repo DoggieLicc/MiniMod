@@ -1,6 +1,4 @@
-# Invite this bot!
-
-https://discord.com/oauth2/authorize?client_id=829104096324616192&permissions=402680006&scope=bot
+**This project has been discontinued, this bot's commands and features have been moved to [this bot](https://github.com/DoggieLicc/doggie-bot)**
 
 
 # Mini Mod
