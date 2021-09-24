@@ -349,4 +349,4 @@ async def on_guild_remove(guild):
 
     await config.delete()
 
-bot.run(bot.secrets['BOT_TOKEN'], bot=True, reconnect=True)
+bot.run(bot.secrets['BOT_TOKEN'])
